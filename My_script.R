@@ -131,7 +131,71 @@ plot(sensitivity_analysis)
 
 # Q4 ----
 # Load Lalonde observational dataset
-lalonde_obs <- read.csv("https://docs.google.com/spreadsheets/d/e/2PACX-1vR-BQzMNOodmgQSHEtImgpJeENmPS6POrIHsQaTqjP0NXPAt6OzO3scVBR4Az0sgdMJ3CDYuJNdiYMY/pub?gid=1299980585&single=true&output=csv")
+lalonde_obs <- read.csv("c:/data/cps_data - cps_data.csv")
 
-# Data structure
+# Check data structure
 str(lalonde_obs)
+
+# Part A: Using sensemakr on the Lalonde dataset ----
+# Use "nodegree" as the self-evidently important variable
+model_part_a <- lm(re78 ~ treat + age + education + black + hispanic + married + nodegree + re74 + re75, data = lalonde_obs)
+
+# Perform sensitivity analysis with sensemakr
+sensitivity_part_a <- sensemakr(
+  model = model_part_a,
+  treatment = "treat",
+  benchmark_covariates = "nodegree",  # Self-evidently important variable
+  kd = 1:3
+)
+
+# Print sensitivity analysis results
+summary(sensitivity_part_a)
+print(sensitivity_part_a)
+
+# Part B: Genetic Matching and Sensemakr Analysis ----
+# Perform genetic matching
+X <- lalonde_obs[, c("age", "education", "black", "hispanic", "married", "nodegree", "re74", "re75")]
+genetic_match <- GenMatch(
+  Tr = lalonde_obs$treat,
+  X = X,
+  pop.size = 100,
+  wait.generations = 10,
+  caliper = NULL,
+  replace = TRUE
+)
+
+# Conduct matching
+matched_data <- Match(
+  Y = lalonde_obs$re78,
+  Tr = lalonde_obs$treat,
+  X = X,
+  Weight.matrix = genetic_match
+)
+
+# Extract matched indices and weights
+treated_indices <- matched_data$index.treated
+control_indices <- matched_data$index.control
+
+# Create a matched dataset
+matched_obs <- lalonde_obs[c(treated_indices, control_indices), ]
+
+# Perform regression on the matched dataset
+model_part_b <- lm(
+  re78 ~ treat + age + education + black + hispanic + married + nodegree + re74 + re75,
+  data = matched_obs
+)
+
+# Print regression summary
+summary(model_part_b)
+
+# Perform sensitivity analysis with sensemakr
+sensitivity_part_b <- sensemakr(
+  model = model_part_b,
+  treatment = "treat",
+  benchmark_covariates = "nodegree",
+  kd = 1:3
+)
+
+# Display and summarize sensitivity results
+summary(sensitivity_part_b)
+print(sensitivity_part_b)
